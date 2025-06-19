@@ -1,13 +1,13 @@
-import os
 import requests
 import json
+import os # <-- Убедитесь, что эта строка есть
 import google.generativeai as genai
 from flask import Flask, request, Response
 
 # --- Инициализация Flask ---
 app = Flask(__name__)
 
-# --- ВАШИ КЛЮЧИ И НАСТРОЙКИ ---
+# --- КЛЮЧИ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ---
 VIBER_AUTH_TOKEN = os.environ.get("VIBER_AUTH_TOKEN")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -17,7 +17,6 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 # --- Функция для получения новостей (без изменений) ---
 def get_latest_news(category='general'):
-    """Получает последние 5 новостей по заданной категории."""
     print(f"Запрошена категория: {category}")
     try:
         url = f"https://gnews.io/api/v4/top-headlines?category={category}&lang=ru&max=5&apikey={NEWS_API_KEY}"
@@ -26,29 +25,23 @@ def get_latest_news(category='general'):
         if "articles" in data and data["articles"]:
             news_list = []
             for article in data['articles']:
-                # Собираем только заголовок и источник для анализа
                 news_item = f"Заголовок: {article['title']}. Источник: {article['source']['name']}."
                 news_list.append(news_item)
-            return "\n".join(news_list) # Возвращаем сплошной текст для ИИ
+            return "\n".join(news_list)
         else:
             print(f"Для категории '{category}' не найдено статей. Ответ API: {data}")
-            return None # Возвращаем None, если новостей нет
+            return None
     except Exception as e:
         print(f"Ошибка при получении новостей: {e}")
         return None
 
-# --- НОВАЯ ФУНКЦИЯ: Создание сводки с помощью ИИ ---
+# --- Функция для создания сводки с помощью ИИ (без изменений) ---
 def summarize_news_with_ai(news_text):
-    """Отправляет текст новостей в Gemini и получает краткую сводку."""
     if not news_text:
         return "Не удалось получить новости для анализа."
-    
     print("Отправляем текст в Gemini для создания сводки...")
     try:
-        # Выбираем модель (gemini-1.5-flash - быстрая и эффективная)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # Создаем промпт (задание) для ИИ
         prompt = (
             "Ты — профессиональный новостной редактор. "
             "Проанализируй следующий набор новостных заголовков. "
@@ -57,19 +50,17 @@ def summarize_news_with_ai(news_text):
             "Вот новости:\n"
             f"{news_text}"
         )
-        
-        # Генерируем ответ
         response = model.generate_content(prompt)
-        
         print("Сводка от Gemini получена.")
         return response.text
-
     except Exception as e:
         print(f"Ошибка при обращении к Gemini API: {e}")
         return "Извините, ИИ-аналитик временно недоступен."
 
-# --- Функция для отправки сообщений в Viber (без изменений) ---
+# --- ОБНОВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЙ ---
 def send_message(receiver_id, text):
+    """Отправляет текстовое сообщение пользователю Viber и печатает ответ от API."""
+    print(f"Попытка отправить сообщение пользователю {receiver_id}...")
     headers = {"X-Viber-Auth-Token": VIBER_AUTH_TOKEN}
     payload = {
         "receiver": "QkA3Fd6/7rP9prh+PJLy1Q==",
@@ -78,11 +69,18 @@ def send_message(receiver_id, text):
         "type": "text",
         "text": text
     }
-    requests.post("https://chatapi.viber.com/pa/send_message", json=payload, headers=headers)
+    try:
+        # Отправляем POST-запрос на API Viber
+        response = requests.post("https://chatapi.viber.com/pa/send_message", json=payload, headers=headers)
+        # ПЕЧАТАЕМ ОТВЕТ ОТ VIBER В ЛОГ
+        print(f"Ответ от Viber API: Статус-код = {response.status_code}, Тело ответа = {response.text}")
+    except Exception as e:
+        print(f"Критическая ошибка при отправке сообщения в Viber: {e}")
 
-# --- ГЛАВНАЯ ЛОГИКА БОТА: теперь с вызовом ИИ ---
+# --- Главная логика бота (без изменений) ---
 @app.route('/', methods=['POST'])
 def incoming():
+    # ... (остальной код функции incoming остается без изменений) ...
     viber_request = request.get_json()
 
     if viber_request['event'] == 'message':
@@ -100,11 +98,7 @@ def incoming():
 
         if category_to_fetch:
             send_message(sender_id, f"Ищу новости и готовлю ИИ-аналитика...")
-            
-            # Шаг 1: Получаем текст новостей
             news = get_latest_news(category=category_to_fetch)
-            
-            # Шаг 2: Если новости есть, передаем их ИИ для создания сводки
             if news:
                 summary = summarize_news_with_ai(news)
                 send_message(sender_id, summary)
@@ -119,4 +113,5 @@ def incoming():
 
 # --- Запускаем наш сервер (без изменений) ---
 if __name__ == "__main__":
+    # Эта часть не используется на Render, но оставляем для локальных тестов
     app.run(host='0.0.0.0', port=8080)
