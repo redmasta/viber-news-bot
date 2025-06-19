@@ -11,6 +11,7 @@ app = Flask(__name__)
 VIBER_AUTH_TOKEN = os.environ.get("VIBER_AUTH_TOKEN")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+VIBER_USER_KEY = os.environ.get("VIBER_USER_KEY")
 
 # --- Конфигурация Google AI ---
 genai.configure(api_key=GEMINI_API_KEY)
@@ -63,7 +64,7 @@ def send_message(receiver_id, text):
     print(f"Попытка отправить сообщение пользователю {receiver_id}...")
     headers = {"X-Viber-Auth-Token": VIBER_AUTH_TOKEN}
     payload = {
-        "receiver": "QkA3Fd6/7rP9prh+PJLy1Q==",
+        "receiver": VIBER_USER_KEY,
         "min_api_version": 1,
         "sender": {"name": "Мой Новостной Бот"},
         "type": "text",
