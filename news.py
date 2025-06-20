@@ -1,6 +1,6 @@
 import requests
 import json
-import os # <-- Убедитесь, что эта строка есть
+import os
 import google.generativeai as genai
 from flask import Flask, request, Response
 
@@ -64,9 +64,9 @@ def send_message(receiver_id, text):
     print(f"Попытка отправить сообщение пользователю {receiver_id}...")
     headers = {"X-Viber-Auth-Token": VIBER_AUTH_TOKEN}
     payload = {
-        "receiver": VIBER_USER_KEY,
+        "receiver": receiver_id,
         "min_api_version": 1,
-        "sender": {"name": "Мой Новостной Бот"},
+        "sender": {"name": "Trumper"},
         "type": "text",
         "text": text
     }
@@ -95,6 +95,7 @@ def incoming():
         elif message_text == "/tech": category_to_fetch = "technology"
         elif message_text == "/science": category_to_fetch = "science"
         elif message_text == "/health": category_to_fetch = "health"
+        elif message_text == "/politics": category_to_fetch = "politics"
         elif message_text == "/entertainment": category_to_fetch = "entertainment"
 
         if category_to_fetch:
@@ -107,7 +108,7 @@ def incoming():
                 send_message(sender_id, f"Не удалось найти актуальные новости по категории '{category_to_fetch}'.")
 
         else:
-            help_text = "Доступные команды:\n/news, /sport, /tech, /science, /health, /entertainment"
+            help_text = "Доступные команды:\n/news,\n/sport,\n/tech,\n/science,\n/health,\n/politics,\n/entertainment"
             send_message(sender_id, help_text)
     
     return Response(status=200)
