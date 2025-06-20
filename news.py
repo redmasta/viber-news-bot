@@ -11,10 +11,10 @@ app = Flask(__name__)
 VIBER_AUTH_TOKEN = os.environ.get("VIBER_AUTH_TOKEN")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-VIBER_USER_KEY = os.environ.get("VIBER_USER_KEY")
 
 # --- Конфигурация Google AI ---
 genai.configure(api_key=GEMINI_API_KEY)
+
 
 # --- Функция для получения новостей (без изменений) ---
 def get_latest_news(category='general'):
@@ -35,6 +35,7 @@ def get_latest_news(category='general'):
     except Exception as e:
         print(f"Ошибка при получении новостей: {e}")
         return None
+
 
 # --- Функция для создания сводки с помощью ИИ (без изменений) ---
 def summarize_news_with_ai(news_text):
@@ -58,30 +59,62 @@ def summarize_news_with_ai(news_text):
         print(f"Ошибка при обращении к Gemini API: {e}")
         return "Извините, ИИ-аналитик временно недоступен."
 
-# --- ОБНОВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЙ ---
-def send_message(receiver_id, text):
-    """Отправляет текстовое сообщение пользователю Viber и печатает ответ от API."""
+# --- НОВАЯ ФУНКЦИЯ: Создаем клавиатуру с кнопками ---
+def create_main_keyboard():
+    """Создает и возвращает JSON-объект клавиатуры для Viber."""
+    return {
+        "Type": "keyboard",
+        "Buttons": [
+            {
+                "Columns": 3, "Rows": 1, "ActionType": "reply",
+                "ActionBody": "/news", "Text": "🌐 Главные"
+            },
+            {
+                "Columns": 3, "Rows": 1, "ActionType": "reply",
+                "ActionBody": "/politics", "Text": "🏛️ Политика"
+            },
+            {
+                "Columns": 3, "Rows": 1, "ActionType": "reply",
+                "ActionBody": "/tech", "Text": "💻 Технологии"
+            },
+            {
+                "Columns": 3, "Rows": 1, "ActionType": "reply",
+                "ActionBody": "/sport", "Text": "⚽ Спорт"
+            },
+            {
+                "Columns": 3, "Rows": 1, "ActionType": "reply",
+                "ActionBody": "/science", "Text": "🔬 Наука"
+            },
+            {
+                "Columns": 3, "Rows": 1, "ActionType": "reply",
+                "ActionBody": "/health", "Text": "❤️ Здоровье"
+            }
+        ]
+    }
+
+# --- ОБНОВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЙ: теперь с поддержкой клавиатуры ---
+def send_message(receiver_id, text, keyboard=None):
+    """Отправляет сообщение пользователю Viber, опционально с клавиатурой."""
     print(f"Попытка отправить сообщение пользователю {receiver_id}...")
     headers = {"X-Viber-Auth-Token": VIBER_AUTH_TOKEN}
     payload = {
-        "receiver": receiver_id,
-        "min_api_version": 1,
-        "sender": {"name": "Trumper"},
-        "type": "text",
-        "text": text
+        "receiver": receiver_id, "min_api_version": 7, # <-- Увеличили версию API для поддержки клавиатур
+        "sender": {"name": "Trumper"}, "type": "text", "text": text
     }
+    # Если передана клавиатура, добавляем ее в тело запроса
+    if keyboard:
+        payload['keyboard'] = keyboard
+    
     try:
-        # Отправляем POST-запрос на API Viber
         response = requests.post("https://chatapi.viber.com/pa/send_message", json=payload, headers=headers)
-        # ПЕЧАТАЕМ ОТВЕТ ОТ VIBER В ЛОГ
         print(f"Ответ от Viber API: Статус-код = {response.status_code}, Тело ответа = {response.text}")
     except Exception as e:
         print(f"Критическая ошибка при отправке сообщения в Viber: {e}")
 
-# --- Главная логика бота (без изменений) ---
+
+# --- ГЛАВНАЯ ЛОГИКА БОТА: изменена отправка приветственного сообщения ---
 @app.route('/', methods=['POST'])
 def incoming():
-    # ... (остальной код функции incoming остается без изменений) ...
     viber_request = request.get_json()
 
     if viber_request['event'] == 'message':
@@ -91,29 +124,29 @@ def incoming():
         category_to_fetch = None
         
         if message_text in ["/news", "/general"]: category_to_fetch = "general"
-        elif message_text == "/sport": category_to_fetch = "sports"
+        elif message_text == "/politics": category_to_fetch = "politics"
         elif message_text == "/tech": category_to_fetch = "technology"
+        elif message_text == "/sport": category_to_fetch = "sports"
         elif message_text == "/science": category_to_fetch = "science"
         elif message_text == "/health": category_to_fetch = "health"
-        elif message_text == "/politics": category_to_fetch = "politics"
-        elif message_text == "/entertainment": category_to_fetch = "entertainment"
-
+        # entertainment убрали, чтобы кнопки красиво смотрелись
+        
         if category_to_fetch:
             send_message(sender_id, f"Ищу новости и готовлю ИИ-аналитика...")
             news = get_latest_news(category=category_to_fetch)
             if news:
                 summary = summarize_news_with_ai(news)
-                send_message(sender_id, summary)
+                send_message(sender_id, summary) # Отправляем сводку без клавиатуры
             else:
                 send_message(sender_id, f"Не удалось найти актуальные новости по категории '{category_to_fetch}'.")
-
         else:
-            help_text = "Доступные команды:\n/news,\n/sport,\n/tech,\n/science,\n/health,\n/politics,\n/entertainment"
-            send_message(sender_id, help_text)
+            # --- Теперь отправляем приветствие вместе с клавиатурой ---
+            help_text = "Привет! Я новостной бот Trumper. Выберите категорию новостей:"
+            main_keyboard = create_main_keyboard()
+            send_message(sender_id, help_text, main_keyboard) # Передаем клавиатуру в функцию
     
     return Response(status=200)
 
 # --- Запускаем наш сервер (без изменений) ---
 if __name__ == "__main__":
-    # Эта часть не используется на Render, но оставляем для локальных тестов
     app.run(host='0.0.0.0', port=8080)
