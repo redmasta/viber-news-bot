@@ -53,9 +53,8 @@ def summarize_news_with_ai(news_text):
             "Твоя задача — не просто пересказать новости, а дать глубокий, но сжатый анализ ситуации.\n\n"
             "Проанализируй каждую новость из списка ниже. Для каждой новости предоставь ответ в следующем структурированном виде:\n\n"
             "**Заголовок:** (Здесь заголовок новости)\n"
-            "**Краткая суть:** (В 1-2 предложениях, что произошло)\n"
             "**Анализ и прогноз:** (Здесь твое видение. Каковы возможные последствия? Какой скрытый контекст? Кто ключевые игроки и каковы их мотивы? Что может произойти дальше? Свяжи это событие с более широкими трендами.)\n\n"
-            "Сохраняй объективный и взвешенный тон. Отделяй каждую новость тремя дефисами (---).\n\n"
+            "Сохраняй объективный и взвешенный тон. Отделяй каждую новость дефисами (---).\n\n"
             "Вот новости для анализа:\n"
             f"{news_text}"
         )
@@ -92,14 +91,22 @@ def send_message(receiver_id, text, keyboard=None):
 @app.route('/', methods=['POST'])
 def incoming():
     viber_request = request.get_json()
+    # Печатаем в лог абсолютно все входящие запросы для отладки
     print(f"\n--- Получен новый запрос от Viber ---\n{viber_request}")
 
+    # ===== ГЛАВНАЯ ПРОВЕРКА! =====
+    # Выполняем логику, ТОЛЬКО если это сообщение от пользователя.
+    # Все остальные события (delivered, seen, failed) будут проигнорированы.
     if viber_request.get('event') == 'message':
+        
         sender_id = viber_request['sender']['id']
-        print(f"Это сообщение от пользователя с ID: {sender_id}")
+        print(f"Это СООБЩЕНИЕ от пользователя с ID: {sender_id}") # Добавим лог для ясности
+
         message_text = viber_request['message']['text'].lower()
+        
         category_to_fetch = None
         
+        # --- Логика выбора категории (остается без изменений) ---
         if message_text in ["/news", "/general"]: category_to_fetch = "general"
         elif message_text == "/politics": category_to_fetch = "politics"
         elif message_text == "/tech": category_to_fetch = "technology"
@@ -107,8 +114,9 @@ def incoming():
         elif message_text == "/science": category_to_fetch = "science"
         elif message_text == "/health": category_to_fetch = "health"
         
+        # --- Логика отправки ответа (остается без изменений) ---
         if category_to_fetch:
-            send_message(sender_id, f"Ищу новости и подключаю ИИ-аналитика...")
+            send_message(sender_id, "Ищу новости и подключаю ИИ-аналитика...")
             news = get_latest_news(category=category_to_fetch)
             if news:
                 summary = summarize_news_with_ai(news)
@@ -120,6 +128,7 @@ def incoming():
             main_keyboard = create_main_keyboard()
             send_message(sender_id, help_text, main_keyboard)
     
+    # Отвечаем Viber статус 200 OK на ЛЮБОЕ событие, чтобы он не слал их повторно.
     return Response(status=200)
 
 if __name__ == "__main__":
